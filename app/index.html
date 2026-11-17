@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light">
+  <title>日志拾光 · 本地日志查看器</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="page-shell">
+    <header class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">本地日志查看器</p>
+        <h1>日志拾光</h1>
+        <p class="subtitle">把零散的 JSONL 日志摊开来看：筛选、统计、定位异常。所有内容只在你的浏览器里处理。</p>
+      </div>
+      <div class="privacy-note" aria-label="隐私说明">
+        <span class="privacy-dot" aria-hidden="true"></span>
+        不上传 · 无依赖 · 双击即用
+      </div>
+    </header>
+
+    <main>
+      <section class="panel source-panel" aria-labelledby="source-title">
+        <div class="panel-heading">
+          <h2 id="source-title">载入日志</h2>
+          <p>每行一条 JSON，字段：timestamp、level、service、status、duration_ms、message。</p>
+        </div>
+
+        <div class="source-grid">
+          <div class="source-card">
+            <h3>从文件读取</h3>
+            <p class="source-hint">选择本机的 .jsonl 或 .log 文件，坏行会被单独跳过。</p>
+            <div class="source-actions">
+              <input id="file-input" class="visually-hidden" type="file" accept=".jsonl,.log,.txt,application/json,text/plain">
+              <label class="button button-primary" for="file-input">选择 JSONL 文件</label>
+              <button id="sample-btn" class="button button-ghost" type="button">载入示例</button>
+            </div>
+          </div>
+
+          <div class="source-card">
+            <label class="source-label" for="paste-input">粘贴日志</label>
+            <textarea id="paste-input" rows="5" spellcheck="false" placeholder='{"timestamp":"2026-11-17T09:00:00+08:00","level":"INFO","service":"gateway","status":200,"duration_ms":40,"message":"GET /health"}'></textarea>
+            <div class="paste-footer">
+              <span class="source-hint">支持多行，直接粘贴原始 JSONL 即可。</span>
+              <button id="paste-btn" class="button button-secondary" type="button">分析粘贴内容</button>
+            </div>
+          </div>
+        </div>
+
+        <p id="load-status" class="load-status" role="status">尚未载入日志。可以选文件、粘贴内容，或先载入示例看看。</p>
+      </section>
+
+      <section class="stats" aria-label="当前筛选结果统计">
+        <article class="stat-card stat-count">
+          <p class="stat-label">当前记录</p>
+          <p class="stat-value" id="stat-count">0</p>
+          <p class="stat-note">条日志</p>
+        </article>
+        <article class="stat-card stat-error">
+          <p class="stat-label">ERROR</p>
+          <p class="stat-value" id="stat-error">0</p>
+          <p class="stat-note">条错误日志</p>
+        </article>
+        <article class="stat-card stat-slow">
+          <p class="stat-label">慢请求</p>
+          <p class="stat-value" id="stat-slow">0</p>
+          <p class="stat-note">duration_ms ≥ 1000</p>
+        </article>
+        <article class="stat-card stat-avg">
+          <p class="stat-label">平均耗时</p>
+          <p class="stat-value" id="stat-avg">—</p>
+          <p class="stat-note">当前筛选范围</p>
+        </article>
+      </section>
+
+      <section class="panel filter-panel" aria-labelledby="filter-title">
+        <div class="filter-heading">
+          <h2 id="filter-title">筛选</h2>
+          <button id="reset-filters" class="text-button" type="button">重置筛选</button>
+        </div>
+        <div class="filter-row">
+          <div class="field">
+            <label for="level-filter">日志级别</label>
+            <select id="level-filter" disabled>
+              <option value="">全部级别</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="service-filter">服务</label>
+            <select id="service-filter" disabled>
+              <option value="">全部服务</option>
+            </select>
+          </div>
+          <div class="field field-wide">
+            <label for="keyword-filter">关键词</label>
+            <input id="keyword-filter" type="search" placeholder="在服务名和消息中匹配，例如 timeout" autocomplete="off" disabled>
+          </div>
+        </div>
+      </section>
+
+      <section id="issue-panel" class="issue-panel" aria-labelledby="issue-title" hidden>
+        <details>
+          <summary id="issue-summary">有日志行被跳过</summary>
+          <p class="issue-hint">这些行不会影响其他日志。行号按原始文件的物理行计算。</p>
+          <ul id="issue-list" class="issue-list"></ul>
+        </details>
+      </section>
+
+      <section class="panel table-panel" aria-labelledby="table-title">
+        <div class="table-heading">
+          <div>
+            <h2 id="table-title">日志明细</h2>
+            <p id="table-subtitle" class="table-subtitle">载入日志后，这里会按筛选结果实时更新。</p>
+          </div>
+          <div class="table-actions">
+            <button id="export-csv-btn" class="button button-secondary" type="button" disabled>导出当前结果</button>
+            <p id="export-note" class="export-note" role="status" aria-live="polite"></p>
+          </div>
+        </div>
+        <div class="table-scroll">
+          <table>
+            <caption class="visually-hidden">日志明细，按文件中的原始顺序展示</caption>
+            <thead>
+              <tr>
+                <th scope="col">时间</th>
+                <th scope="col">级别</th>
+                <th scope="col">服务</th>
+                <th scope="col" class="numeric">状态码</th>
+                <th scope="col" class="numeric">耗时</th>
+                <th scope="col">消息</th>
+              </tr>
+            </thead>
+            <tbody id="log-tbody">
+              <tr class="empty-row">
+                <td colspan="6" id="empty-message">还没有日志。选择 JSONL 文件、粘贴日志，或载入示例开始排查。</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <footer class="page-footer">
+      <p>日志拾光 · 纯本地静态页面，无第三方依赖，不使用网络请求。</p>
+    </footer>
+  </div>
+
+  <script src="js/core.js"></script>
+  <script src="js/sample-data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

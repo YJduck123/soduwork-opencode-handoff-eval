@@ -1,0 +1,16 @@
+{
+  "verifiedAt": "2026-11-18T00:12:38+08:00",
+  "browser": "Chrome, file://, external independent acceptance",
+  "unitTests": { "total": 17, "passed": 17, "failed": 0 },
+  "sample": { "validRecords": 8, "errors": 3, "slow": 3, "averageDuration": "750.0 ms", "invalidLines": 1 },
+  "filters": { "level": "ERROR", "service": "gateway", "keyword": "reset", "records": 1 },
+  "emptyResult": { "records": 0, "exportDisabled": true },
+  "csv": {
+    "downloaded": true,
+    "bom": [239, 187, 191],
+    "lineEndings": "CRLF",
+    "bytes": 138,
+    "multilineMessageQuoted": true
+  },
+  "textRendering": { "htmlExecuted": false, "imageElementCreated": false }
+}

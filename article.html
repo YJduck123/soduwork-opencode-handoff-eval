@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我让 Pi 和 OpenCode 接力写了个日志工具，SoduWork 的跨底座开发实测</title>
+    <style>
+        body { max-width: 800px; margin: 0 auto; padding: 40px 20px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif; line-height: 1.8; color: #333; }
+        h1 { color: #0F4C81; border-bottom: 2px solid #0F4C81; padding-bottom: 10px; font-size: 28px; }
+        h2 { color: #0F4C81; margin-top: 40px; font-size: 22px; }
+        h3 { color: #1a5a8a; margin-top: 30px; font-size: 18px; }
+        code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-family: Consolas, Monaco, "Courier New", monospace; font-size: 14px; }
+        pre { background: #f4f4f4; padding: 16px; border-radius: 8px; overflow-x: auto; border: 1px solid #e0e0e0; }
+        pre code { background: none; padding: 0; font-size: 13px; line-height: 1.5; }
+        img { max-width: 100%; height: auto; display: block; margin: 24px auto; border: 1px solid #ddd; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        a { color: #0F4C81; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        blockquote { border-left: 4px solid #0F4C81; margin: 16px 0; padding: 12px 20px; color: #555; background: #f8f9fa; border-radius: 0 4px 4px 0; }
+        p { margin: 16px 0; text-align: justify; }
+        strong { color: #222; }
+    </style>
+</head>
+<body>
+<p>这次我拿一个纯前端日志工具做了实测。全程用同一个模型 <code>workbuddy/deepseek-v4.1-flash</code>，先让 Pi 写「日志拾光」，再换 OpenCode 加 CSV 导出。最后工具确实能跑，Pi 留下的 13 项测试也没被弄坏，OpenCode 补到了 17 项。</p>
+<p>但过程没有宣传词里那么顺：OpenCode 中途卡住了，CSV 代码落盘后，Agent 也没有正常交卷。下面把做成的东西、切换过程和这次失败都放出来。本文的代码与运行记录来自我自己的测试环境，没有额外对比其他模型。</p>
+<p>我给的需求很普通：不用安装环境，打开 HTML 就能看 JSONL 日志。按级别、服务和关键词筛选，把错误和慢请求标出来，统计条数和平均耗时。页面里附一份样例，方便直接点着看效果。</p>
+<p>Pi 在指定的 <code>app</code> 文件夹里写了 8 个文件，交付说明列出 13 项测试通过。它的结构挺清爽，HTML、样式和脚本分开，解析与筛选放在 <code>core.js</code>，界面事件放在 <code>app.js</code>。样例里还放了一行坏 JSON 和一条耗时格式错误的记录，正好检查它会不会把异常数据硬塞进统计。</p>
+<p>切换界面上可以选 OpenCode，工作区还是 <code>app</code>。模型没换，这样不用把后续差异解释成换了个更聪明的模型。</p>
+<p>随后我只追加了一条要求：</p>
+<p>OpenCode 没有重做页面，直接在现有按钮区加了「导出当前结果」。<code>core.js</code> 里新增 <code>toCsv(records)</code>，固定六列：时间、级别、服务、状态码、耗时和消息。这个函数接收的是筛选后的数组，所以导出内容与页面看到的行一致。</p>
+<p>界面这边的关键逻辑只有几行：</p>
+<p>它的转义处理不是简单 <code>join(',')</code>：遇到逗号、引号或换行时，将单元格放进双引号，内部双引号翻倍。文件开头加 UTF-8 BOM，行尾用 CRLF，Excel 打开中文不容易乱码。空结果时禁用按钮。</p>
+<p>我重新跑了测试，17 项全过，其中新增 4 项覆盖 BOM、列序、特殊字符、筛选导出和空结果。接着在 Chrome 里实际点了一遍：样例解析出 8 条有效记录、3 条 ERROR、3 条慢请求，平均耗时 750 ms；筛到 <code>ERROR + gateway + reset</code> 后，页面只剩 1 条，下载的 CSV 也只有这 1 条，多行消息仍是一个完整单元格。</p>
+<p>第一次切换后，OpenCode 一直读文件、复述计划，没有写完功能。界面显示模型请求失败，但原始日志里的错误是 <code>Permission channel is unavailable; operation was not approved</code>，不能把它笼统记成模型不行。</p>
+<p>停止、重启后又遇到权限重新确认。我保留原来的会话、工作区和代码，用一句「继续完成上一条 CSV 导出任务」再发了一次。这次代码和测试确实落了盘，但运行记录最终停在 <code>interrupted</code>，错误是 <code>Access session interrupted by Runner restart; confirm permissions to resume</code>。所以上文的 17 项测试和浏览器验收是我独立做的，不是拿 Agent 的「已完成」当验收。</p>
+<p>另外，当前这个聊天使用了 <code>chat-</code> 加 UUID 的任务 ID，共 41 个字符；Runner 事件接收端限制为 36 个字符，日志持续出现 <code>DELIVERY_INVALID</code>。它会影响运行状态回传，不能据此断言每一步代码失败都是它造成的。我没有改产品源码，只把失败现场、日志和截图保存下来。</p>
+<p>这次实测我最喜欢的是切换时不用搬项目：Pi 的文件、OpenCode 的修改和追加测试都在同一个目录里，衔接很自然。需要改进的是中断后的恢复提示，让用户知道去哪重新确认、原会话能否继续，而不是只看到一个转圈或宽泛的模型错误。</p>
+<p>如果你也常先搭原型、再补导出或报表，可以试这条接力方式。首版验收留一份，追加需求只写增量，换底座后先读旧测试再动手，会省不少解释成本。本文数据和验证材料在<a href="https://github.com/YJduck123/soduwork-opencode-handoff-eval">实测仓库</a>。</p>
+<hr style="margin: 40px 0; border: none; border-top: 1px solid #ddd;">
+<p style="text-align: center; color: #888; font-size: 14px;">实测环境与代码：<a href="https://github.com/YJduck123/soduwork-opencode-handoff-eval">GitHub 仓库</a></p>
+</body>
+</html>

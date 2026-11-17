@@ -1,0 +1,18 @@
+{
+  "recordedAt": "2026-11-17T14:16:28.819Z",
+  "nativeRunId": "30307f91-dc48-57f7-b77d-0fc0067bc2f8",
+  "nativeState": "stopped",
+  "lastNativeError": {
+    "name": "AcpBridgeError",
+    "message": "Permission channel is unavailable; operation was not approved"
+  },
+  "publicDisplay": "停止尚未确认，请重试",
+  "nativeTaskId": "chat-14a6933b-1ad8-42ff-b1f5-3f4a8cde8837",
+  "nativeTaskIdLength": 41,
+  "deliveryValidationTaskIdMax": 36,
+  "toolCalls": 25,
+  "lastEventAt": "2026-11-17T14:02:22Z",
+  "codeChanges": false,
+  "coreTestsPassed": 13,
+  "usageAvailable": false
+}
